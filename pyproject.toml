@@ -1,0 +1,29 @@
+[project]
+name = "tone-forge"
+version = "1.0.0"
+description = "ToneForge — AI guitar tone engineer for IK Multimedia AmpliTube 5 (Standalone) as a Hermes Agent plugin"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "efesn" }]
+keywords = ["hermes-agent", "hermes-plugin", "guitar", "tone", "amplitube", "midi", "windows"]
+
+[project.urls]
+Homepage = "https://github.com/efesn/toneforge-hermes-plugin"
+Repository = "https://github.com/efesn/toneforge-hermes-plugin"
+Issues = "https://github.com/efesn/toneforge-hermes-plugin/issues"
+Changelog = "https://github.com/efesn/toneforge-hermes-plugin/blob/main/CHANGELOG.md"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Sound/Audio",
+]
+
+# Deliberately empty: the plugin runs on the standard library alone.
+# `python-rtmidi` is an OPTIONAL accelerator, not a dependency — it has no wheel
+# for every CPython release (3.14 at the time of writing), and the built-in
+# Windows winmm backend covers that case. Install it yourself if you want the
+# rtmidi backend:
+#   python -m pip install "python-rtmidi>=1.4,<2"
+dependencies = []

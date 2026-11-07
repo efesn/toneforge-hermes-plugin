@@ -1,0 +1,38 @@
+name: tone-forge
+version: 1.0.0
+manifest_version: 2
+api_version: 1
+description: "ToneForge — AI guitar tone engineer for IK Multimedia AmpliTube 5 (Standalone): natural-language tone recipes, a versioned preset library, and a MIDI bridge with user-verified CC mappings."
+author: "efesn"
+license: MIT
+homepage: "https://github.com/efesn/toneforge-hermes-plugin"
+tags: [guitar, tone, amplitube, midi, audio, music]
+provides_tools:
+  - toneforge_create_preset
+  - toneforge_adjust_preset
+  - toneforge_save_preset
+  - toneforge_list_presets
+  - toneforge_get_preset
+  - toneforge_delete_preset
+  - toneforge_list_profiles
+  - toneforge_midi_status
+  - toneforge_list_midi_ports
+  - toneforge_select_midi_port
+  - toneforge_send_midi
+  - toneforge_set_parameter
+  - toneforge_map_parameter
+  - toneforge_list_mappings
+  - toneforge_remove_mapping
+  - toneforge_midi_probe
+config_schema:
+  midi_backend:
+    type: str
+    choices: [auto, winmm, rtmidi]
+    default: auto
+    label: "MIDI backend"
+    description: "auto = rtmidi when installed, otherwise the built-in Windows winmm driver (no dependency)."
+  default_channel:
+    type: int
+    default: 1
+    label: "Default MIDI channel"
+    description: "1-16. Used when a tool call does not name a channel."
