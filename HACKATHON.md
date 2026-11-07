@@ -44,8 +44,9 @@ assignments; the plugin stores what you learned in AmpliTube's own MIDI dialog,
 converts 0-100 values into that mapping's CC range, and reports `applied:
 "unverified"` rather than pretending the knob moved.
 
-139 unit tests, zero dependencies, no network, no native AmpliTube file format
-claims.
+149 unit tests, no third-party Python dependencies, no network client of its own — plus a reference-track
+analyser that measures a real recording (`ffmpeg`, and `yt-dlp` only when a URL is passed) instead of
+guessing a style from a genre name. No native AmpliTube file format claims.
 
 ---
 
@@ -71,10 +72,18 @@ claims.
 - raw CC sending, mapped parameter setting with conversion report, MIDI-Learn probe
 - honest result envelope: `applied: "unverified"`, `bytes_hex`, scope warnings
 
+**Reference analysis (1.1)**
+
+- `toneforge_analyze_reference`: local file or URL → octave and third-octave balance, spectral slope,
+  95% rolloff, low-frequency tuning peaks, decay tail, stereo width
+- `ffmpeg` decode + pure-Python radix-2 FFT: still no third-party Python packages
+- measured numbers override the profile's params/EQ/gate/space, with provenance kept per value
+- honest scope: the **mix** is measured, the amp model is inferred; a clip fade is never called reverb
+
 **Engineering**
-- 16 tools, strict schemas, JSON-string handlers that never raise
-- 139 tests (validation, engine, storage, mapping, MIDI with mocked hardware, handler contract)
-- `hermes plugins validate` → 15/15 checks; `hermes plugins doctor --ci` → 16 tools registered
+- 17 tools, strict schemas, JSON-string handlers that never raise
+- 149 tests incl. reference analysis on synthetic `ffmpeg` fixtures
+- `hermes plugins validate` → 15/15 checks; `hermes plugins doctor --ci` → 17 tools registered
 - live MIDI egress verified on real Windows hardware
 
 ---
@@ -83,9 +92,9 @@ claims.
 
 | Claim | Evidence |
 |---|---|
-| Tests pass | `python -m unittest discover -s tests` → `Ran 139 tests … OK` |
+| Tests pass | `python -m unittest discover -s tests` → `Ran 149 tests … OK` |
 | Plugin validates | `hermes plugins validate ./tone-forge` → `Validation passed` (15 checks incl. declared-tools and security scan) |
-| Plugin loads and registers | `hermes plugins doctor ./tone-forge --ci` → `16 tool(s), 0 hook(s)` |
+| Plugin loads and registers | `hermes plugins doctor ./tone-forge --ci` → `17 tool(s), 0 hook(s)` |
 | Real MIDI leaves the machine | `scripts/live_midi_check.py` → `B0 14 66` on `winmm`, rc 0, `LIVE MIDI SEND: OK` |
 | No port is ever assumed | test + live: `send_midi` with no selection → error "never sends to a port you did not choose" |
 | AmpliTube's MIDI rules are documented, not guessed | AmpliTube 5 manual ch. 5 (official PDF shipped with the app): CC/PC only, Global vs Preset scope, Min/Max percentages, Curve, receive channel |
@@ -96,7 +105,9 @@ claims.
   but no loopback MIDI port is, so the last hop is documented rather than
   demonstrated. The demo script cuts to AmpliTube only when a real port exists.
 - **Model availability per edition** — hence "families + search terms", never model names.
-- **Native `.at5p` presets** — undocumented format, deliberately unsupported.
+- **Native `.at5p` presets** — deliberately unsupported. The format is not opaque: it is XML with model
+  GUIDs resolvable from `AmpliTube 5.pak`. Writing one is a clone-and-rewrite job kept out of the plugin
+  until it can be verified inside AmpliTube rather than merely parsed.
 
 ---
 
@@ -106,8 +117,9 @@ claims.
 |---|---|
 | Usefulness | the industrial-metal Drop D recipe is a genuinely good starting point, not filler |
 | Depth of integration | hooks into real AmpliTube MIDI control, with its real constraints respected |
-| Engineering quality | 139 tests, typed exceptions, atomic writes, no core imports, modular by concern |
-| Honesty | explicit `applied: "unverified"`, no invented model names, no `.at5p` fabrication |
+| Engineering quality | 149 tests, typed exceptions, atomic writes, no core imports, modular by concern |
+| Honesty | explicit `applied: "unverified"`, measured-vs-inferred stated in every analysis response,
+no invented model names, no `.at5p` fabrication |
 | Documentation | README + feasibility report + Windows install + MIDI setup + architecture + 20 example prompts |
 
 ---
@@ -116,16 +128,40 @@ claims.
 
 - 🎸 **ToneForge** — describe a tone, get the whole recipe, explained.
 - 🎛 **Real MIDI bridge** — no `pip install`, talks to Windows' MIDI driver directly; moves only the CCs you assigned.
-- 🧪 **139 tests, 16 tools, 0 dependencies, 0 network calls** — and it tells you what it cannot verify.
+- 🧪 **149 tests, 17 tools, no third-party dependencies** — and it tells you what it cannot verify.
+- 🎧 **Reference-track analysis** — give it a song; it measures the mix (bands, slope, rolloff, tuning,
+  decay) and sets the recipe from the evidence, caveats attached.
 
 ---
 
 ## 9. Pre-submission checklist
 
-- [ ] Repository created, README screenshot added, topics set
-- [ ] `LICENSE` copyright line filled with your name
-- [ ] `CHANGELOG.md` version matches `plugin.yaml`
-- [ ] ZIP archive built (exclude `__pycache__`, `.git`)
-- [ ] Demo video recorded from `docs/DEMO_SCRIPT.md` and under 90 s
-- [ ] Decide whether to include the AmpliTube screenshot in the README
-- [ ] Submit — **only with your explicit permission**
+Done:
+- [x] Plugin built, validated, loaded by Hermes (17 tools, 149 tests)
+- [x] `CHANGELOG.md` 1.1.0 matches `plugin.yaml` and `pyproject.toml`
+- [x] README rewritten for 1.1.0 (counts, reference analysis, corrected `.at5p` claim, ffmpeg/yt-dlp rows)
+- [x] `ARCHITECTURE.md`, `SECURITY.md`, `EXAMPLE_PROMPTS.md`, `INSTALLATION_WINDOWS.md`, `DEMO_SCRIPT.md` updated
+
+Still to do (yours):
+- [ ] **Push `main`** — commit `3207e75` is local only; the catalog PR must pin a pushed SHA
+- [ ] Set the GitHub repo description + the nine topics from §1
+- [ ] Replace `Copyright (c) 2026 ToneForge contributors` in `LICENSE` if you want your name
+- [ ] Add at least one real screenshot to `docs/assets/` and reference it in the README gallery
+- [ ] Record the demo: **under 90 seconds**, showing the plugin working (not slides)
+- [ ] Post it on X tagging `@NousResearch`
+- [ ] Open the catalog PR (§10), then submit the form with both links
+
+---
+
+## 10. Official entry steps
+
+Deadline **Nov 11, 2026, 5:00 PM EST** = **Nov 12, 01:00 Türkiye saati**. Judged on usefulness, reliability,
+polish and creativity.
+
+1. **Catalog PR** — add exactly one file, `plugin-catalog/tone-forge.yaml`, to `NousResearch/hermes-agent`
+   (fork → branch → PR). Full 40-char SHA, quoted version. Ready copy:
+   [`hackathon/catalog-entry.yaml`](hackathon/catalog-entry.yaml).
+2. **Demo video on X** — under 90 seconds, showing it working, tagging `@NousResearch`.
+3. **Form** — both links: <https://form.typeform.com/to/FwJLvOln>
+
+You can submit the form as soon as the PR is open; catalog CI runs when a maintainer starts it.
