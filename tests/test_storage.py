@@ -131,7 +131,7 @@ class DataDirTests(unittest.TestCase):
             previous = os.environ.get("TONEFORGE_DATA_DIR")
             os.environ["TONEFORGE_DATA_DIR"] = tmp
             try:
-                self.assertEqual(preset_store.data_dir(), Path(tmp).resolve())
+                self.assertEqual(preset_store.data_dir().resolve(), Path(tmp).resolve())
             finally:
                 if previous is None:
                     os.environ.pop("TONEFORGE_DATA_DIR", None)
@@ -149,7 +149,10 @@ class DataDirTests(unittest.TestCase):
             os.environ.pop("TONEFORGE_DATA_DIR", None)
             os.environ["HERMES_HOME"] = tmp
             try:
-                self.assertEqual(preset_store.data_dir(), Path(tmp).resolve() / "plugin-data" / "tone-forge")
+                self.assertEqual(
+                    preset_store.data_dir().resolve(),
+                    Path(tmp).resolve() / "plugin-data" / "tone-forge",
+                )
             finally:
                 for key, value in previous.items():
                     if value is None:
