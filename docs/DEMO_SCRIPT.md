@@ -1,135 +1,107 @@
-# 90-second demo script
+# 90-second demo script (v1.1)
 
-Goal: show natural language → a real, explainable tone → a stored preset → a real
-MIDI message leaving the machine. Record at 1080p, single window (Hermes desktop),
-font size bumped one step, no dead air.
+Goal: natural language -> an explainable tone -> **a tone built from a real recording** ->
+a stored preset. Record 1080p, one window (Hermes desktop), font one step up, no dead air.
+Hard cap: 90 seconds.
 
 **Before recording**
 
-- `hermes plugins list | grep tone-forge` shows `enabled`.
-- loopMIDI running with a port named `ToneForge`; AmpliTube open with `ToneForge`
-  as MIDI Input and a CC assigned to the amp gain knob (Part B/C of
-  `MIDI_SETUP_WINDOWS.md`).
-- Delete demo presets so the library looks clean: `toneforge_list_presets`.
-- Have the chat scrolled to an empty session.
+- `hermes plugins list | grep tone-forge` shows `enabled`; 17 tools registered.
+- Fresh session, empty chat.
+- One local reference file ready (any song you own) so the analysis is fast and offline.
+- Optional, only if loopMIDI is running with a `ToneForge` port and a CC assigned in
+  AmpliTube: keep AmpliTube open for Part E. **No loopback port? Skip Part E - never stage
+  a knob move.**
 
 ---
 
-## 0:00–0:08 — the problem
+## 0:00-0:07 - the problem
 
-**Say:** "AmpliTube sounds great, but turning 'I want a Rammstein-ish industrial tone'
-into actual knob positions is a skill. ToneForge does that part."
+**Say:** "AmpliTube sounds great, but turning 'Rammstein-ish industrial, Drop D' into actual
+knob positions is a skill. ToneForge does that part - and it can measure a real record
+instead of guessing from a genre name."
 
-**Show:** empty chat, one breath of the desktop app.
+**Show:** empty chat.
 
 ---
 
-## 0:08–0:25 — create the tone
+## 0:07-0:22 - create a tone
 
 **Type:**
 
 > Create a heavy industrial metal tone for Drop D, inspired by Rammstein's Sonne. Tight low end, controlled highs, keep note definition.
 
-**Say (while it runs):** "One tool call — genre, reference, tuning, and three
-plain-language constraints."
+**Say:** "One tool call: genre, reference, tuning, three plain-language constraints."
 
-**Show:** `toneforge_create_preset` result. Point at three lines:
+**Show:** the result. Point at three things only:
 
-- the **signal chain** — gate → overdrive → amp → cab/mic → EQ → delay → reverb
-- the **parameters** — gain 74, bass ~33, mid 65, presence 49
-- the **explanation** — "bass is trimmed because Drop D already supplies weight"
-
----
-
-## 0:25–0:38 — it explains itself
-
-**Say:** "This is the part that matters: it does not just print numbers, it tells
-you why. The overdrive is used as a filter, not a distortion. The presence sits
-below the treble on purpose."
-
-**Show:** scroll the `why` bullets once, slowly, then stop.
+- the **signal chain** - gate -> overdrive -> amp -> cab/mic -> post-EQ -> delay -> reverb
+- the **parameters** - gain 74, bass 33, mid 65, presence 49
+- the **explanation** - "bass is trimmed because Drop D already supplies weight"
 
 ---
 
-## 0:38–0:50 — adjust in conversation
+## 0:22-0:52 - measure a real recording (the differentiator)
 
 **Type:**
 
-> Make the low end tighter and add a bit more presence.
+> Here's the track - build me the tone, the riff starts at 3:56.
 
-**Show:** `toneforge_adjust_preset` → the change list:
+**Paste:** the local file path (or a URL).
 
-```text
-params.bass        33 → 28
-eq.low_cut_hz      92 → 102
-eq.100hz           -4 → -6
-params.presence    49 → 57
-```
+**Say:** "Same plugin, different evidence. It decodes the audio with ffmpeg, runs its own FFT,
+and measures where the record's energy actually sits."
 
-**Say:** "Before and after, field by field. And the stored preset is untouched
-until I say save."
+**Show, in this order:**
+
+- `octave_bands_db` - "energy peaks at 63-125 Hz"
+- `shape` - "95% rolloff at 3,359 Hz, slope -6.5 dB per octave: a dark, dense mix"
+- `low_peaks` - "82.03 Hz, -7.9 cents off E2 -> standard E"
+- `caveats` - **read one out loud:** "full mix, not an isolated guitar stem"
+
+**Say:** "These numbers come from the audio, and it tells you what it can't know. That's the
+difference between this and a prompt wrapper."
 
 ---
 
-## 0:50–0:58 — save it
+## 0:52-1:06 - adjust and save
 
 **Type:**
 
-> Save it as "Sonne Rhythm".
+> Reduce the gain by 5 and add presence. Save it as "Sonne Test".
 
-**Show:** `toneforge_save_preset` → slug `sonne-rhythm`, version 1, path under
-`plugin-data/tone-forge/presets/`.
+**Say:** "The diff is a contract - field, before, after. The stored preset is untouched until
+I say save."
 
-**Say:** "A versioned JSON preset in the local library — not a fake `.at5p` file."
-
----
-
-## 0:58–1:08 — MIDI status
-
-**Type:**
-
-> Is the MIDI bridge ready?
-
-**Show:** `toneforge_midi_status` → `active_backend: winmm`, `ports_available: 1`,
-`selected_port: ToneForge`, `ready: true`.
-
-**Say:** "No Python MIDI package needed — it talks to the Windows MIDI driver
-directly. And note what it refuses to claim."
+**Show:** the `changes` list, then the saved slug + version.
 
 ---
 
-## 1:08–1:24 — move the actual knob
+## 1:06-1:22 - MIDI (only with a real loopback port)
 
 **Type:**
 
 > Set the amp gain to 80.
 
-**Show:** `toneforge_set_parameter` →
+**Show:** `bytes_hex: "B0 14 66"`, then the knob moving in AmpliTube.
 
-```json
-"value": 102, "bytes_hex": "B0 14 66", "applied": "unverified"
-```
+**Say:** "No `pip install` - it talks to Windows' MIDI driver directly, and only to CCs I
+assigned myself. It reports `applied: unverified`, because only AmpliTube can confirm the
+knob moved."
 
-Cut to **AmpliTube**: the gain knob visibly moves to ~80%.
-
-**Say:** "Eighty out of a hundred, converted to CC 102 on channel 1. The knob
-moved — and ToneForge still labels the result 'unverified', because only
-AmpliTube can prove it."
-
-> If the room/recording cannot show AmpliTube (no loopMIDI installed), skip the
-> cut and say: "The bytes are confirmed out of Windows; whether AmpliTube applied
-> them needs the loopback port, which is a five-minute setup — documented, not
-> faked." Show `bytes_hex` instead. **Never** stage a fake knob move.
+*No loopback port? Say instead:* "The bridge is real and tested against Windows' driver; the
+last hop into AmpliTube needs a virtual cable I haven't installed, so I won't fake it." Then
+go straight to the close.
 
 ---
 
-## 1:24–1:30 — close
+## 1:22-1:30 - close
 
-**Say:** "Seventeen tools, 149 tests, no third-party dependencies, no cloud. ToneForge designs
-the tone, explains it, stores it, and moves the knobs you mapped — and it is
-explicit about the difference."
+**Say:** "Seventeen tools, 149 tests, no third-party dependencies. It designs the tone,
+explains it, stores it, measures a record when you have one - and it is explicit about what
+it cannot verify."
 
-**Show:** the tool list or the README header, then stop.
+**Show:** the preset library list, then stop.
 
 ---
 
@@ -137,40 +109,40 @@ explicit about the difference."
 
 | # | Time | Content | Source |
 |---|---|---|---|
-| 1 | 0:00 | Empty chat + one-line framing | screen |
-| 2 | 0:08 | Industrial-metal prompt → full recipe | `toneforge_create_preset` |
-| 3 | 0:25 | Explanation bullets | same result, `why` |
-| 4 | 0:38 | "Tighter + presence" → change list | `toneforge_adjust_preset` |
-| 5 | 0:50 | Save → slug/version/path | `toneforge_save_preset` |
-| 6 | 0:58 | Status → backend/port/ready | `toneforge_midi_status` |
-| 7 | 1:08 | Gain 80 → `B0 14 66` → knob moves | `toneforge_set_parameter` + AmpliTube |
-| 8 | 1:24 | Closing line | README / tool list |
+| 1 | 0:00 | Empty chat + framing | screen |
+| 2 | 0:07 | Industrial-metal prompt -> recipe | `toneforge_create_preset` |
+| 3 | 0:22 | Track prompt -> bands/shape/peaks | `toneforge_analyze_reference` |
+| 4 | 0:38 | Caveats read aloud | same result, `caveats` |
+| 5 | 0:52 | "Less gain, more presence" -> diff | `toneforge_adjust_preset` |
+| 6 | 0:58 | Save -> slug/version | `toneforge_save_preset` |
+| 7 | 1:06 | Gain 80 -> `B0 14 66` -> knob | `toneforge_set_parameter` + AmpliTube |
+| 8 | 1:22 | Close | library list |
 
 ## Narration (clean take, ~150 words)
 
-> AmpliTube sounds great, but turning "I want a Rammstein-ish industrial tone" into
-> actual knob positions is a skill. ToneForge does that part.
+> AmpliTube sounds great, but turning "I want a Rammstein-ish industrial tone" into actual
+> knob positions is a skill. ToneForge does that part.
 >
-> One sentence in: genre, reference, tuning, three constraints. Out comes a full
-> recipe — signal chain in order, amp and cab character, pedal settings, seven-band
-> EQ, gate, and normalised gain, bass, mid, treble, presence, master. And it
-> explains itself: the bass is trimmed because Drop D already supplies weight; the
-> overdrive is a filter, not a distortion.
+> One sentence in: genre, reference, tuning, three constraints. Out comes a full recipe -
+> signal chain in order, amp and cab character, pedals, seven-band EQ, gate, and normalised
+> gain, bass, mid, treble, presence, master. And it explains itself: the bass is trimmed
+> because Drop D already supplies weight; the overdrive is a filter, not a distortion.
 >
-> "Tighter, more presence" gives a before-and-after list, field by field, and the
-> stored preset stays untouched until I save it. Then it is a versioned JSON preset
-> in the local library — not a fake AmpliTube file.
+> Then the part a prompt can't do: give it the actual recording and it measures it - band
+> balance, spectral slope, where the mix rolls off, the low-frequency peaks that identify the
+> tuning. It says "full mix, not an isolated guitar stem" out loud, because that is the limit
+> of what a mix can tell you.
 >
-> The MIDI bridge needs no Python packages: it talks to the Windows MIDI driver
-> directly. Gain to eighty becomes CC 102 — and the knob moves. ToneForge still
-> calls the result unverified, because only AmpliTube can prove it. That honesty is
-> the point.
+> "Less gain, more presence" gives a before-and-after list, field by field, and the preset
+> stays untouched until I save it. Then it is a versioned JSON preset - not a fake AmpliTube
+> file.
 
 ## If something fails on camera
 
 | Failure | Recovery |
 |---|---|
-| No MIDI port | Show `toneforge_midi_status` blockers; that is the honest state, and the checklist is on screen |
-| Model ignores the tool | Re-prompt with the tool name: "use toneforge_create_preset" |
-| Slow model turn | Cut the wait; keep the result |
-| AmpliTube not responding | Check MIDI Input + channel on screen, then retry once — that is a useful 10 seconds, not a blooper |
+| No MIDI port | Show `toneforge_midi_status` blockers; that is the honest state |
+| Analysis says "tuning not determined" | Say the clip is too short, then pass `tuning` explicitly in a second call |
+| Model ignores the tool | Re-prompt naming the tool: "use toneforge_analyze_reference" |
+| Slow model turn | Cut the wait, keep the result |
+| ffmpeg missing | `ffmpeg -version` on screen, then install - or skip to Part D and say why |
