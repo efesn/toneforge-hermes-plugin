@@ -3,9 +3,10 @@
 Hermes plugin entry point. ``register(ctx)`` is called once at startup; it wires
 the tool schemas to their handlers and applies the plugin's settings.
 
-Nothing here reaches the network, spawns a process or writes outside the
-plugin's own data directory. MIDI output only happens when a tool is called with
-an explicit port (or an explicitly selected one).
+Nothing here reaches the network or writes outside the plugin's own data
+directory. Two deliberate exceptions, both only when a tool asks for them:
+``toneforge_analyze_reference`` spawns ``ffmpeg`` to decode audio (and ``yt-dlp``
+when it is given a URL), and the MIDI tools write to the port the user selected.
 """
 
 from __future__ import annotations

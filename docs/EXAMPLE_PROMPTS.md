@@ -12,6 +12,12 @@ prompts require MIDI; the ones that do are marked **[MIDI]** and need the setup 
 → `toneforge_create_preset(genre="industrial metal", reference="Rammstein", tuning="drop D", purpose="rhythm", instructions="tight low end, controlled highs")`
 Back: 6-7 stage chain starting with a gate, gain 74, bass in the 30s, mids above neutral, HP around 90 Hz, plus the rationale.
 
+**"Here's the track - build me the tone, riff starts at 3:56."** *(with an audio file or URL)*
+→ `toneforge_analyze_reference(url="https://www.youtube.com/watch?v=...", start_s=236, end_s=252, genre="black metal", purpose="rhythm", save=true)`
+Back: the measurements (octave balance, slope, 95% rolloff, low peaks, tail, stereo width), a recipe whose
+numbers come from them (`gain 74, bass 38, mid 58, presence 44`, HP 100 Hz / LP 6.5 kHz, reverb 22%), and the
+full-mix caveats. Pass `tuning` explicitly when the response says the tuning was not determined.
+
 **"Give me a Metallica-style rhythm tone in standard tuning."**
 → `toneforge_create_preset(genre="thrash", reference="Metallica", tuning="standard")`
 Back: the thrash profile — mids pushed, lean bass, fast gate, no reverb wash.
@@ -122,7 +128,7 @@ Back: slug `sonne-rhythm`, version 1, absolute path.
 
 | Prompt | Response |
 |---|---|
-| "Write an AmpliTube `.at5p` file for this." | Refuses — the format is undocumented; stores a JSON recipe instead. |
+| "Write an AmpliTube `.at5p` file for this." | Refuses — ToneForge writes JSON recipes only. (The `.at5p` format is XML with model GUIDs, but writing one stays out of scope until it can be verified inside AmpliTube, not just parsed.) |
 | "Just send CC 7 to whatever port." | Refuses — no port selected, and CC 7 is not assumed to be anything. |
 | "Load the preset into AmpliTube for me." | Explains the recipe must be dialled in by hand; it can only move already-assigned CCs. |
 | "Delete all presets." | Requires `confirm=true` per call; there is no bulk delete. |

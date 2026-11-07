@@ -99,15 +99,18 @@ Validation passed.
 Plugin Doctor: ...\tone-forge
   manifest: tone-forge 1.0.0 (standalone)
   OK: runtime discovery, manifest parsing, import, and registration passed
-  registrations: 16 tool(s), 0 hook(s)
+  registrations: 17 tool(s), 0 hook(s)
 ```
+
+Reference analysis additionally needs `ffmpeg` on PATH (and `yt-dlp` if you want to pass URLs);
+both are optional and every other tool works without them.
 
 Then run the unit suite (no hardware required):
 
 ```bash
 cd "$HERMES_HOME/plugins/tone-forge"
 python -m unittest discover -s tests
-# Ran 139 tests ... OK
+# Ran 149 tests ... OK
 ```
 
 ---

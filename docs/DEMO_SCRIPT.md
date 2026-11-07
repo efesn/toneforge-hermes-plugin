@@ -125,7 +125,7 @@ AmpliTube can prove it."
 
 ## 1:24–1:30 — close
 
-**Say:** "Sixteen tools, 139 tests, no dependencies, no cloud. ToneForge designs
+**Say:** "Seventeen tools, 149 tests, no third-party dependencies, no cloud. ToneForge designs
 the tone, explains it, stores it, and moves the knobs you mapped — and it is
 explicit about the difference."
 

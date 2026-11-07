@@ -19,12 +19,13 @@ Three constraints drove every structural decision:
 
 | Module | Responsibility | Depends on |
 |---|---|---|
-| `__init__.py` | `register(ctx)`: read settings, register 16 tools | `schemas`, `tools` |
+| `__init__.py` | `register(ctx)`: read settings, register 17 tools | `schemas`, `tools` |
 | `schemas.py` | Tool schemas and descriptions — the model-facing surface | stdlib |
 | `tools.py` | Handlers: validate args → call domain → JSON envelope | all domain modules |
 | `tone_engine.py` | Resolve genre, apply tuning/pickup/purpose, instruction modifiers, render chain, diff adjustments | `tone_profiles`, `validation` |
 | `tone_profiles.py` | Data: 10 tunings, 6 pickups, 6 purposes, 9 profiles, chain order, disclaimer | stdlib |
 | `preset_store.py` | JSON preset library: slugs, atomic writes, versioning, listing | `validation`, optional `plugins.plugin_storage` |
+| `reference_analysis.py` | Reference-track measurement (`ffmpeg` decode + pure-Python FFT) and the mapping from measurements to tone overrides | `validation` |
 | `midi_map.py` | User CC mapping table + value conversion | `validation` |
 | `midi_io.py` | Backends (`winmm`, `rtmidi`), port selection, send, probe | `validation` |
 | `validation.py` | Ranges, text hygiene, slugs, path safety, error types | stdlib |
@@ -179,8 +180,9 @@ what the live check sent to a real Windows device.
 
 ## Security posture
 
-- No `subprocess`, no `eval`, no `exec`, no dynamic `import` of user strings, no
-  network client anywhere in the plugin.
+- No `eval`, no `exec`, no dynamic `import` of user strings, no network client anywhere in the
+  plugin. The single `subprocess` user is `reference_analysis` (`ffmpeg` to decode audio, and
+  `yt-dlp` only when a tool call passes an explicit `url`); opt-in per call, fixed argv, no shell.
 - Preset and mapping names are slugged and re-validated; traversal is tested
   (`../escape`, `..`, `/abs`, `a/b`).
 - Writes are restricted to `<HERMES_HOME>/plugin-data/tone-forge/`.

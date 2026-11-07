@@ -11,11 +11,12 @@ from __future__ import annotations
 import functools
 import json
 import logging
+import os
 import sys
 import threading
 from typing import Any, Callable, Optional
 
-from . import midi_io, midi_map, preset_store, tone_engine, tone_profiles
+from . import midi_io, midi_map, preset_store, reference_analysis, tone_engine, tone_profiles
 from . import validation as V
 
 logger = logging.getLogger(__name__)
@@ -177,6 +178,84 @@ def _next_steps(*, saved: bool = False) -> list[str]:
     )
     steps.append("toneforge_midi_status shows whether the MIDI bridge is ready before you rely on it.")
     return steps
+
+
+@tool
+def analyze_reference(args: dict, **_: Any) -> dict:
+    """Measure a recording and build a tone recipe from the evidence, not the profile prior."""
+    path = args.get("path")
+    url = args.get("url")
+    if path is not None:
+        path = V.require_text(path, "path", max_len=4096)
+    if url is not None:
+        url = V.require_text(url, "url", max_len=2048)
+    if not path and not url:
+        raise V.ValidationError("give either 'path' (a local audio file) or 'url'")
+
+    start = args.get("start_s")
+    end = args.get("end_s")
+    start = None if start is None else float(V.coerce_int(start, "start_s", lo=0, hi=100000))
+    end = None if end is None else float(V.coerce_int(end, "end_s", lo=0, hi=100000))
+    if start is not None and end is not None and end <= start:
+        raise V.ValidationError("end_s must be greater than start_s")
+
+    workdir: Optional[str] = None
+    meta: dict[str, Any] = {}
+    try:
+        if not path:
+            workdir = reference_analysis.temp_workspace()
+            path, meta = reference_analysis.download(url, workdir)
+        derived = reference_analysis.analyze_and_derive(path, start=start, end=end)
+    except reference_analysis.AnalysisError as exc:
+        raise V.ValidationError(str(exc)) from exc
+    finally:
+        if workdir:
+            try:
+                import shutil as _shutil
+                _shutil.rmtree(workdir, ignore_errors=True)
+            except Exception:  # pragma: no cover - best effort
+                logger.debug("ToneForge could not remove the temp workspace", exc_info=True)
+
+    analysis = derived["analysis"]
+    overrides = dict(derived["overrides"])
+    overrides["caveats"] = analysis.get("caveats", [])
+
+    cfg = tone_engine.build_tone(
+        genre=args.get("genre"),
+        reference=args.get("reference") or meta.get("title"),
+        tuning=args.get("tuning"),
+        pickup=args.get("pickup"),
+        purpose=args.get("purpose"),
+        gain_level=None,
+        instructions=args.get("instructions"),
+        name=args.get("name"),
+    )
+    source = meta.get("title") or analysis.get("file") or "reference audio"
+    tone_engine.apply_overrides(cfg, overrides, source=str(source))
+    if overrides.get("tuning_hint") and not args.get("tuning"):
+        cfg["assumptions"] = list(cfg.get("assumptions", [])) + [
+            f"Tuning {overrides['tuning_hint']} was inferred from the recording's lowest strong partial; "
+            "it is a mix-level estimate, not a certainty."
+        ]
+
+    result: dict[str, Any] = {
+        "analysis": analysis,
+        "source": {"path": os.path.basename(path), "url": url, **meta},
+        "tone": cfg,
+        "applies_automatically": False,
+        "how_to_apply": _HOW_TO_APPLY,
+    }
+    if _bool(args, "save"):
+        record = store().save(cfg, name=cfg["name"], overwrite=_bool(args, "overwrite"))
+        result["saved"] = {
+            "slug": record["slug"],
+            "name": record["name"],
+            "version": record["version"],
+            "path": str(store().path_for(record["slug"])),
+        }
+    result["caveats"] = analysis.get("caveats", [])
+    result["next_steps"] = _next_steps(saved="saved" in result)
+    return result
 
 
 @tool
@@ -637,6 +716,7 @@ def midi_probe(args: dict, **_: Any) -> dict:
 
 HANDLERS: dict[str, Callable[..., str]] = {
     "toneforge_create_preset": create_preset,
+    "toneforge_analyze_reference": analyze_reference,
     "toneforge_adjust_preset": adjust_preset,
     "toneforge_save_preset": save_preset,
     "toneforge_list_presets": list_presets,

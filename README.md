@@ -6,7 +6,9 @@
 
 **An AI guitar tone engineer for [IK Multimedia AmpliTube 5](https://www.ikmultimedia.com/products/amplitube5/) inside [Hermes Agent](https://github.com/NousResearch/hermes-agent).**
 
-Describe a tone in plain language — *"industrial metal for Drop D, tight low end, Rammstein-ish"* — and ToneForge returns a complete, musically-reasoned recipe: signal chain in order, amp and cab character, mic position, pedal settings, 7-band EQ, noise gate, and normalised gain/bass/mid/treble/presence/master values, with an explanation of *why* each choice was made. It can then drive the MIDI CCs you assigned in AmpliTube to move the knobs you mapped.
+Describe a tone in plain language — *"industrial metal for Drop D, tight low end, Rammstein-ish"* — and ToneForge returns a complete, musically-reasoned recipe: signal chain in order, amp and cab character, mic position, pedal settings, 7-band EQ, noise gate, and normalised gain/bass/mid/treble/presence/master values, with an explanation of *why* each choice was made. It can then drive the MIDI CCs you assigned in AmpliTube to move the knobs you mapped. Give it a
+song and it can also **measure the recording** first - band balance, brightness, tuning peaks,
+decay - and set the numbers from what the audio shows instead of from a genre guess.
 
 ToneForge is explicit about the boundary between **designing a tone** and **changing AmpliTube**:
 
@@ -17,6 +19,7 @@ ToneForge is explicit about the boundary between **designing a tone** and **chan
 | Send MIDI CC messages to a loopback port you selected | Guess that CC 20 "is" amp gain — AmpliTube has no such default |
 | Report exactly which bytes went out and on which port | Claim a parameter changed (only AmpliTube can show that) |
 | Explain every parameter move, with before/after values | Promise an exact reproduction of a recorded guitar tone |
+| Measure a reference recording (file or URL) and set the numbers from the audio | Claim any recipe reproduces a record exactly |
 
 ---
 
@@ -24,9 +27,12 @@ ToneForge is explicit about the boundary between **designing a tone** and **chan
 
 Last verified locally on **Windows 11, Python 3.14.9, Hermes Agent v0.23.0+381.g6b21d05**:
 
-- `python -m unittest discover -s tests` → **139 tests, all passing** (no MIDI hardware, no AmpliTube, no network).
+- `python -m unittest discover -s tests` → **149 tests, all passing** (no MIDI hardware, no AmpliTube, no network).
 - `hermes plugins validate ./tone-forge` → **Validation passed** (all 15 checks).
-- `hermes plugins doctor ./tone-forge --ci` → **16 tools registered**, runtime discovery + import + `register(ctx)` OK.
+- `hermes plugins doctor ./tone-forge --ci` → **17 tools registered**, runtime discovery + import + `register(ctx)` OK.
+- `toneforge_analyze_reference` → measured real reference clips end to end (a DSBM album track, two
+  cover solos, an 11 s YouTube Short). The two defects that surfaced - low-peak FFT resolution and a
+  clip fade being reported as a reverb tail - are fixed and regression-tested.
 - `scripts/live_midi_check.py` → **a real Control Change message left the machine** through the built-in Windows `winmm` driver (`B0 14 66`, i.e. CC 20 = 102 on channel 1), and the no-port-selected safety path refused to send.
 
 The same unit suite runs in GitHub Actions on Windows and Linux across supported Python versions. **No screenshot, demo recording, or test result in this repository is staged or fabricated.**
@@ -75,7 +81,7 @@ Not verified on this machine, and therefore not claimed anywhere in the plugin:
 ┌───────────────────────────────────────────▼────────────────────────────────────────────────┐
 │ tone-forge plugin                                                                           │
 │                                                                                             │
-│  __init__.py      register(ctx) → 16 tools, settings (midi_backend, default_channel)         │
+│  __init__.py      register(ctx) → 17 tools, settings (midi_backend, default_channel)         │
 │  schemas.py       tool descriptions + strict JSON schemas (what the model sees)              │
 │  tools.py         handlers: validate → work → JSON; never raises                            │
 │                                                                                             │
@@ -103,7 +109,7 @@ Not verified on this machine, and therefore not claimed anywhere in the plugin:
 
 | Module | Responsibility |
 |---|---|
-| `__init__.py` | `register(ctx)`: read settings, register 16 tools |
+| `__init__.py` | `register(ctx)`: read settings, register 17 tools |
 | `schemas.py` | Tool schemas and descriptions — the model-facing surface |
 | `tools.py` | Handlers: validate args → call domain → JSON envelope |
 | `tone_engine.py` | Resolve genre, apply tuning/pickup/purpose, instruction modifiers, render chain, diff adjustments |
@@ -112,8 +118,11 @@ Not verified on this machine, and therefore not claimed anywhere in the plugin:
 | `midi_map.py` | User CC mapping table + value conversion |
 | `midi_io.py` | Backends (`winmm`, `rtmidi`), port selection, send, probe |
 | `validation.py` | Ranges, text hygiene, slugs, path safety, error types |
+| `reference_analysis.py` | Reference-track measurement (`ffmpeg` decode + pure-Python FFT) and the mapping from measurements to tone overrides |
 
-No network calls, no subprocesses, no writes outside the plugin's data directory. Full rationale: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+No network client, no writes outside the plugin's data directory. The single `subprocess` user is
+reference analysis: `ffmpeg` decodes audio and `yt-dlp` is used only when a tool call passes an
+explicit `url` - never on its own. Full rationale: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
@@ -127,6 +136,7 @@ No network calls, no subprocesses, no writes outside the plugin's data directory
 | AmpliTube | AmpliTube 5 (Standard or higher), **Standalone** mode |
 | Loopback MIDI | [loopMIDI](https://www.tobias-erichsen.de/software/loopmidi.html) (free) — required for the MIDI bridge |
 | Audio | Any audio interface AmpliTube already works with |
+| Reference analysis (optional) | `ffmpeg` on PATH to decode; `yt-dlp` only if you pass a URL. Without them every other tool still works |
 
 ---
 
@@ -156,9 +166,9 @@ hermes plugins doctor  "$HERMES_HOME/plugins/tone-forge" --ci
 python -m unittest discover -s tests
 ```
 
-Expected: `Validation passed`, `16 tool(s)` registered, and `Ran 139 tests ... OK`.
+Expected: `Validation passed`, `17 tool(s)` registered, and `Ran 149 tests ... OK`.
 
-`$HERMES_HOME` is `C:\Users\<you>\AppData\Local\hermes` on a default Windows install, or `~/.hermes`. Hermes loads plugin tools on the next session — restart the desktop app (or start a new `hermes` session) and the 16 `toneforge_*` tools appear.
+`$HERMES_HOME` is `C:\Users\<you>\AppData\Local\hermes` on a default Windows install, or `~/.hermes`. Hermes loads plugin tools on the next session — restart the desktop app (or start a new `hermes` session) and the 17 `toneforge_*` tools appear.
 
 Full walkthrough, including update and uninstall: [`docs/INSTALLATION_WINDOWS.md`](docs/INSTALLATION_WINDOWS.md).
 
@@ -204,6 +214,37 @@ Profiles, tunings and purposes are inspectable:
 
 > What profiles does ToneForge have?
 
+### Match a recording
+
+> Here's the track: <https://www.youtube.com/watch?v=...> - build me the tone, riff starts at 3:56.
+
+That routes to `toneforge_analyze_reference`, which decodes the audio, measures it, and returns a
+recipe whose numbers come from the recording. A trimmed real response:
+
+```json
+{
+  "analysis": {
+    "octave_bands_db": {
+      "63-125": 0.0, "125-250": -0.1, "250-500": -6.3, "500-1000": -9.7,
+      "1000-2000": -12.5, "2000-4000": -15.1, "4000-8000": -25.0
+    },
+    "shape": { "centroid_hz": 900.2, "slope_db_per_oct": -6.53, "rolloff95_hz": 3359.4 },
+    "low_peaks": [{ "hz": 82.03, "nearest_note": "E", "cents_off": -7.9 }],
+    "tuning": { "guess": "standard E (E2 82.4)", "confidence": "low (full mix, ...)" },
+    "tail": { "t30_s": null }
+  },
+  "tone": {
+    "params": { "gain": 74, "bass": 38, "mid": 58, "treble": 52, "presence": 44, "master": 55 },
+    "eq": { "low_cut_hz": 100, "high_cut_hz": 6500 },
+    "space": { "delay_mix": 0.16, "reverb_mix": 0.22 }
+  },
+  "caveats": ["This analyses the full mix, not an isolated guitar stem: ..."]
+}
+```
+
+It analyses the **full mix**, not an isolated guitar stem, and says so in every response: bass and
+kick share the guitar's low strings, so the low-end read is a ceiling rather than a measurement.
+
 ### Example response (trimmed, real output)
 
 For *"industrial metal for Drop D, tight low end, controlled highs, keep note definition"*:
@@ -223,13 +264,16 @@ For *"industrial metal for Drop D, tight low end, controlled highs, keep note de
     "Overdrive / clean boost (optional)",
     "Amplifier",
     "Cabinet + microphone",
-    "7-band EQ",
-    "Delay / reverb"
+    "Post-amp EQ",
+    "Delay",
+    "Reverb"
   ]
 }
 ```
 
-More prompts, expected tool calls and refusal cases: [`docs/EXAMPLE_PROMPTS.md`](docs/EXAMPLE_PROMPTS.md).
+Trimmed for readability: the seven EQ band values, the pedal settings and the mono/stereo width read
+are all present in the real response. More prompts, expected tool calls and refusal cases:
+[`docs/EXAMPLE_PROMPTS.md`](docs/EXAMPLE_PROMPTS.md).
 
 ---
 
@@ -286,11 +330,12 @@ Full instructions, scope rules, mapping ranges and a 12-row troubleshooting tabl
 
 ---
 
-## Tools (16)
+## Tools (17)
 
 | Tool | What it does |
 |---|---|
 | `toneforge_create_preset` | Build a complete tone recipe from genre/reference/tuning/pickup/purpose/gain/instructions; optionally save it. |
+| `toneforge_analyze_reference` | Measure a local audio file (or a URL, via yt-dlp) and build the recipe from the measurements: bands, slope, rolloff, tuning peaks, tail, stereo width. Full mix, not a stem - the response says so. |
 | `toneforge_adjust_preset` | Modify a stored preset or inline recipe in natural language; returns a before/after change list. Saves only with `save=true`. |
 | `toneforge_save_preset` | Store a recipe (or duplicate an existing preset) as a JSON preset; refuses silent overwrites. |
 | `toneforge_list_presets` | List the library, newest first. |
@@ -327,11 +372,16 @@ For MIDI, `param_min`/`param_max` describe the parameter's range (0-100), while 
 | MIDI mappings | `<HERMES_HOME>/plugin-data/tone-forge/midi_map.json` |
 | Selected port + channel | `<HERMES_HOME>/plugin-data/tone-forge/midi_config.json` |
 
-**Privacy: nothing leaves the machine.** ToneForge stores what you tell it and sends MIDI to a port you chose; it never uploads a preset, a mapping or a byte of guitar audio.
+**Privacy: nothing leaves the machine.** ToneForge stores what you tell it and sends MIDI to a port
+you chose; it never uploads a preset, a mapping or a byte of guitar audio. The one outbound path is
+`yt-dlp`, and only when you hand it a URL: the download lands in a temporary directory that is
+deleted when the call ends.
 
 Security properties enforced by the code and covered by tests:
 
-- No `subprocess`, `eval`, `exec`, dynamic import of user strings, or network client anywhere in the plugin.
+- No `eval`, `exec`, dynamic import of user strings, or network client anywhere in the plugin. The one
+  `subprocess` user is `reference_analysis` (`ffmpeg`, plus `yt-dlp` for explicit URLs), called with
+  fixed argv and no shell.
 - Preset and mapping names are slugged and re-validated; path traversal (`../escape`, `..`, absolute paths) is tested and refused.
 - Writes are restricted to `<HERMES_HOME>/plugin-data/tone-forge/`; atomic temp-file + `os.replace` writes prevent half-written files.
 - MIDI output requires an explicit port selection or an explicit port argument on the very call that sends.
@@ -359,6 +409,9 @@ See [`SECURITY.md`](SECURITY.md) for the reporting policy.
 | `device already allocated` | Another app holds the port exclusively | Close it, or restart loopMIDI |
 | `python-rtmidi` will not install | No wheel for your CPython | Not required on Windows — use the built-in `winmm` backend |
 | New plugin code seems ignored | The running gateway keeps previous modules in memory | Restart the desktop app or run `hermes gateway restart` |
+| `ffmpeg was not found on PATH` | reference analysis needs it to decode | install ffmpeg, or set `TONEFORGE_FFMPEG` to its full path |
+| `yt-dlp is not installed, so this URL cannot be fetched` | URL support is opt-in | install yt-dlp, or pass a local audio file with `path` |
+| "tuning not determined" in an analysis | the mix's low end is bass/kick, or the clip is too short | pass `tuning` explicitly (e.g. `"drop D"`) |
 
 More: [`docs/MIDI_SETUP_WINDOWS.md`](docs/MIDI_SETUP_WINDOWS.md) and [`docs/INSTALLATION_WINDOWS.md`](docs/INSTALLATION_WINDOWS.md).
 
@@ -366,14 +419,20 @@ More: [`docs/MIDI_SETUP_WINDOWS.md`](docs/MIDI_SETUP_WINDOWS.md) and [`docs/INST
 
 ## Limitations
 
-- **No native `.at5p` presets.** The format is undocumented; ToneForge will not fabricate a file AmpliTube might reject. Presets are JSON recipes.
+- **No native `.at5p` presets.** ToneForge writes JSON recipes only. (For the record: `.at5p` is not an
+  opaque binary - it is XML with model GUIDs that can be resolved from `AmpliTube 5.pak`. Writing one
+  is a clone-and-rewrite job, deliberately left outside the plugin until it can be verified inside
+  AmpliTube rather than merely parsed.)
 - **No model insertion.** AmpliTube exposes no scripting/remote API for building a chain; the recipe is applied by hand.
 - **Mapping is user-owned.** ToneForge cannot discover which CC you assigned; you tell it. That is a deliberate design choice, not a missing feature.
 - **MIDI reception is unverifiable from inside a plugin.** `applied: "unverified"` is the accurate answer.
 - **Preset-scope assignments.** Amp-knob CCs in AmpliTube are per-preset; drive several presets only after assigning the CCs in each.
 - **Single-machine, offline.** No cloud tone exchange, no ToneNET integration.
 - **`python-rtmidi` is optional, not bundled** — the `winmm` backend exists precisely because that package has no wheel for every Python version.
-- **Reference names are inspiration, not reproduction.** Artist and song names describe a tonal direction; ToneForge does not claim to recreate a recording.
+- **Reference names are inspiration, not reproduction.** Artist and song names describe a tonal direction.
+- **Reference analysis measures the mix.** Octave balance, brightness and decay are measured; the amp
+  model, the pedals and the guitar's own low end are inferred. Clips under ~20 s are weak evidence:
+  loudness-normalised, often mono, and a fade is not a reverb tail.
 
 ---
 
@@ -382,7 +441,8 @@ More: [`docs/MIDI_SETUP_WINDOWS.md`](docs/MIDI_SETUP_WINDOWS.md) and [`docs/INST
 - Per-preset mapping sets (`mapping profile` keyed by AmpliTube preset name) so one library can drive many presets.
 - A `toneforge_export` command that prints a human-readable setup sheet (Markdown) for the pedalboard.
 - Program Change support for preset switching (AmpliTube accepts PC, per the manual).
-- Optional audio-side sanity check: render a DI clip through the user's own chain and compare spectra — only if it can be done without shipping an audio engine.
+- A `.at5p` writer: clone an existing preset, swap model GUIDs from `AmpliTube 5.pak`, and verify it
+  loads in AmpliTube before offering it as a feature.
 - A `/tone` slash command that shows the current preset and MIDI readiness in one line.
 
 ---
@@ -405,7 +465,7 @@ The recording plan, narration, shot list and failure-recovery notes are in [`doc
 ## Development
 
 ```bash
-python -m unittest discover -s tests -v          # unit suite (139 tests, no hardware)
+python -m unittest discover -s tests -v          # unit suite (149 tests, no hardware)
 python scripts/live_midi_check.py                # real winmm MIDI egress (Windows)
 python scripts/test_amplitube.py loopback        # proves the loopMIDI cable end to end
 python scripts/test_amplitube.py sweep           # moves a mapped knob so you can watch it
@@ -413,7 +473,7 @@ hermes plugins doctor . --ci                     # real registration check
 hermes plugins validate .                        # catalog-grade validation
 ```
 
-Layout: `__init__.py` (registration) · `schemas.py` (model-facing) · `tools.py` (handlers) · `tone_engine.py` · `tone_profiles.py` · `preset_store.py` · `midi_io.py` · `midi_map.py` · `validation.py` · `tests/` · `docs/`.
+Layout: `__init__.py` (registration) · `schemas.py` (model-facing) · `tools.py` (handlers) · `tone_engine.py` · `tone_profiles.py` · `preset_store.py` · `reference_analysis.py` · `midi_io.py` · `midi_map.py` · `validation.py` · `tests/` · `docs/`.
 
 CI runs the same unit suite on Windows and Linux across supported Python versions on pushes to `main` and on pull requests: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 

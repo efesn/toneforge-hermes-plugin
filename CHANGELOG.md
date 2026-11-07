@@ -4,6 +4,29 @@ All notable changes to ToneForge are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-11-07
+
+Reference-track analysis: build a tone from what a recording actually measures instead
+of from a genre profile's prior.
+
+### Added
+- `toneforge_analyze_reference`: local file or URL (yt-dlp) -> octave and third-octave
+  balance, spectral slope, 95% rolloff, low-frequency tuning peaks, decay tail and stereo
+  width, then a complete recipe whose numbers come from the audio.
+- `reference_analysis.py`: `ffmpeg`-decoded analysis with a pure-Python radix-2 FFT, so the
+  plugin still needs no third-party Python packages.
+- `tone_engine.apply_overrides()`: writes measured params/EQ/gate/space (and a measured
+  amp/cab family hint) into a normal recipe, keeping the provenance.
+- `tests/test_reference.py`: synthetic `ffmpeg` fixtures, 10 tests.
+
+### Changed
+- A measured recipe replaces the profile's canned `why` lines with the measurements plus one
+  line naming what the profile still contributed (families and structure).
+- Low-string peaks are measured with a 16384-point FFT: at 16 kHz a 4096-point bin is ~90
+  cents at 74 Hz, which cannot tell D from Eb.
+- A decay longer than half the analysed window is treated as a clip fade, never as reverb;
+  the tail falls back to the last 25 s of the track when the window never decays.
+
 ## [1.0.0] — 2026-11-07
 
 First release. Targets Hermes Agent ≥ 0.23.0 (plugin API: `plugin.yaml` +

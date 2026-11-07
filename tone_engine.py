@@ -983,3 +983,80 @@ def describe_changes(changes: list[dict]) -> str:
     if not changes:
         return "no parameter changed"
     return ", ".join(f"{item['field']} {item['before']}->{item['after']}" for item in changes)
+
+
+# --------------------------------------------------------------------------- #
+# Reference-audio overrides
+# --------------------------------------------------------------------------- #
+def apply_overrides(cfg: dict, overrides: dict, *, source: str = "reference audio") -> dict:
+    """Write measured overrides (params/eq/gate/space) into an existing tone config.
+
+    Deliberately additive: the profile still owns the amp/cab/pedal *families*, while
+    the numbers come from the recording. Every applied value keeps its reason.
+    """
+    params = overrides.get("params") or {}
+    for key in ("gain", "bass", "mid", "treble", "presence", "master"):
+        if key in params:
+            cfg["params"][key] = int(params[key])
+
+    eq = overrides.get("eq") or {}
+    if "low_cut_hz" in eq:
+        cfg["eq"]["low_cut_hz"] = int(eq["low_cut_hz"])
+    if "high_cut_hz" in eq:
+        cfg["eq"]["high_cut_hz"] = int(eq["high_cut_hz"])
+    for band in eq.get("bands") or []:
+        for target in cfg["eq"]["bands"]:
+            if int(target["hz"]) == int(band["hz"]):
+                target["db"] = band["db"]
+
+    gate = overrides.get("gate") or {}
+    for key in ("enabled", "threshold_db", "decay_ms", "hold_ms"):
+        if key in gate:
+            cfg["gate"][key] = gate[key]
+
+    space = overrides.get("space") or {}
+    for key in ("delay_mix", "reverb_mix"):
+        if key in space:
+            cfg["space"][key] = space[key]
+
+    if overrides.get("amp"):
+        cfg["amp"] = dict(overrides["amp"])
+    if overrides.get("cabinet"):
+        cfg["cabinet"] = dict(overrides["cabinet"])
+
+    _sync_gate_pedal(cfg)
+    for pedal in cfg["pedals"]:
+        lowered = pedal["type"].casefold()
+        if "reverb" in lowered and "reverb_mix" in space:
+            pedal["settings"]["mix"] = round(float(space["reverb_mix"]), 3)
+        elif "delay" in lowered and "delay_mix" in space:
+            pedal["settings"]["mix"] = round(float(space["delay_mix"]), 3)
+
+    measured = [f"Measured against {source}: {line}" for line in (overrides.get("why") or [])]
+    if overrides.get("amp"):
+        families = (
+            "Amp and cabinet families were chosen from the measured brightness; pedal layout and tuning "
+            f"structure come from the '{cfg.get('genre_label', 'profile')}' profile. Numeric settings were "
+            "measured from the recording."
+        )
+    else:
+        families = (
+            f"Amp, cabinet and pedal families come from the '{cfg.get('genre_label', 'profile')}' profile; "
+            "every numeric setting here was measured from the recording."
+        )
+    cfg["why"] = measured + [families]
+    cfg["signal_chain"] = render_signal_chain(cfg)
+    cfg["description"] = _describe(cfg)
+    cfg["reference_analysis"] = {
+        "source": source,
+        "params": dict(cfg["params"]),
+        "eq": {
+            "low_cut_hz": cfg["eq"]["low_cut_hz"],
+            "high_cut_hz": cfg["eq"]["high_cut_hz"],
+            "bands": [dict(band) for band in cfg["eq"]["bands"]],
+        },
+        "gate": dict(cfg["gate"]),
+        "space": dict(cfg["space"]),
+        "caveats": list(overrides.get("caveats") or []),
+    }
+    return cfg

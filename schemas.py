@@ -316,8 +316,77 @@ MIDI_PROBE = _schema(
     required=[],
 )
 
+ANALYZE_REFERENCE = _schema(
+    "toneforge_analyze_reference",
+    (
+        "Analyse an actual recording (local audio file, or a URL fetched with yt-dlp) and build a tone "
+        "recipe from what the audio measures: octave and third-octave balance, spectral slope, 95% "
+        "rolloff, low-frequency tuning peaks, decay tail and stereo width. Use this when the user names "
+        "a song or gives a reference track and wants a tone that matches the record rather than a genre "
+        "prior. It analyses the FULL MIX, not an isolated guitar stem - band balance and brightness are "
+        "measurable, the amp model is inferred, and every result says so. Spawns ffmpeg (and yt-dlp when "
+        "a url is given); nothing is downloaded unless 'url' is passed. It does not change AmpliTube or "
+        "write native .at5p files."
+    ),
+    {
+        "path": {
+            "type": "string",
+            "description": "Local audio file to analyse (wav/flac/mp3/m4a). Give this or 'url'.",
+        },
+        "url": {
+            "type": "string",
+            "description": "Video/page URL to fetch audio from with yt-dlp. Requires yt-dlp and ffmpeg installed.",
+        },
+        "start_s": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Window start in seconds - point this at the riff the user cares about.",
+        },
+        "end_s": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Window end in seconds. Defaults to start_s + 20.",
+        },
+        "genre": {
+            "type": "string",
+            "description": (
+                "Genre for the underlying recipe skeleton (amp/cab/pedal families before the measured "
+                "overrides land). Unknown styles fall back to the closest profile."
+            ),
+        },
+        "reference": {
+            "type": "string",
+            "description": "Artist/song label stored with the preset; defaults to the analysed file or video title.",
+        },
+        "tuning": {
+            "type": "string",
+            "description": "Override the tuning guessed from the audio, e.g. 'drop D'.",
+        },
+        "pickup": {
+            "type": "string",
+            "description": "Pickup type: humbucker, active humbucker, single coil, P-90, mini humbucker, piezo.",
+        },
+        "purpose": {
+            "type": "string",
+            "description": "Tone purpose: rhythm, lead, solo, clean, ambient or crunch.",
+        },
+        "instructions": {
+            "type": "string",
+            "description": "Extra shaping in plain language, applied before the measured override.",
+        },
+        "name": {"type": "string", "description": "Preset name; generated when omitted."},
+        "save": {"type": "boolean", "description": "Store the result in the preset library (default false)."},
+        "overwrite": {
+            "type": "boolean",
+            "description": "Only with save=true: allow replacing an existing preset of the same name.",
+        },
+    },
+    required=[],
+)
+
 TOOLS: list[dict[str, Any]] = [
     CREATE_PRESET,
+    ANALYZE_REFERENCE,
     ADJUST_PRESET,
     SAVE_PRESET,
     LIST_PRESETS,
