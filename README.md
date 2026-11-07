@@ -10,17 +10,14 @@ Describe a tone in plain language — *"industrial metal for Drop D, tight low e
 song and it can also **measure the recording** first - band balance, brightness, tuning peaks,
 decay - and set the numbers from what the audio shows instead of from a genre guess.
 
-ToneForge is explicit about the boundary between **designing a tone** and **changing AmpliTube**:
+ToneForge is explicit about where the boundary sits. It designs a tone and explains every
+choice, stores presets as versioned JSON, measures a reference recording when you give it one,
+exports a preset to a real `.at5p` by cloning one of yours, and moves the MIDI CCs you assigned
+yourself.
 
-| ToneForge does | ToneForge does not |
-|---|---|
-| Generate a full tone recipe you can dial in by hand | Insert models, change amp sims, or click inside AmpliTube for you |
-| Store, list, version, adjust and delete its own JSON presets | Invent a model your AmpliTube edition does not have |
-| Export a stored preset to a real `.at5p` via `scripts/at5p_export.py`, verifying every model GUID against your own presets | Claim the export is bit-identical to what AmpliTube itself would save |
-| Send MIDI CC messages to a loopback port you selected | Guess that CC 20 "is" amp gain — AmpliTube has no such default |
-| Report exactly which bytes went out and on which port | Claim a parameter changed (only AmpliTube can show that) |
-| Explain every parameter move, with before/after values | Promise an exact reproduction of a recorded guitar tone |
-| Measure a reference recording (file or URL) and set the numbers from the audio | Claim any recipe reproduces a record exactly |
+It does not insert models or click inside AmpliTube for you, does not know which CC drives which
+knob until you tell it, cannot confirm that a CC actually changed anything, and does not promise a
+note-for-note reproduction of a recorded guitar tone.
 
 ---
 
@@ -52,7 +49,7 @@ Not verified on this machine, and therefore not claimed anywhere in the plugin:
 - Nine hand-built profiles: Industrial Metal, Modern Metal, Thrash Metal, Metalcore, Hard Rock, Classic Rock, Clean, Ambient, Lead/Solo.
 - A deliberately detailed **industrial-metal / Drop D** starting point: tight low end, controlled high end, defined mids, hard gate, optional overdrive in front.
 - Tuning compensation for 10 tunings (standard → Drop A, 7-string), pickup compensation for 6 pickup types, purpose shaping for 6 roles (rhythm/lead/solo/clean/ambient/crunch).
-- Free-text shaping in English **and Turkish**: `tighter`, `more mids`, `less muddy`, `add presence`, `djent`, `doom`, `daha sıkı`, `gain azalt`, `mid artır`, `daha kuru`, plus explicit `set gain to 75`.
+- Free-text shaping in English **and Turkish**: `tighter`, `more mids`, `less muddy`, `add presence`, `djent`, `doom`, `daha sıkı`, `gain azalt`, `mid artır`, `daha kuru`, plus explicit amounts in both forms: `set gain to 75` and `reduce the gain by 5`.
 - Deterministic output: the same request always produces the same recipe, which makes presets reproducible and tests meaningful.
 
 **Preset library**
@@ -63,6 +60,14 @@ Not verified on this machine, and therefore not claimed anywhere in the plugin:
 - **Export to a native `.at5p`** with `scripts/at5p_export.py`: it clones the chain skeleton from a
   preset already on your disk, resolves amp/cab/effect GUIDs from those same presets, writes the
   recipe's numbers, and refuses to emit a model GUID your library does not already use.
+
+**Reference analysis**
+
+- `toneforge_analyze_reference`: local file or URL → octave and third-octave balance, spectral
+  slope, 95% rolloff, low-frequency tuning peaks, decay tail and stereo width.
+- `ffmpeg` decode plus a pure-Python FFT, so the plugin still needs no third-party packages.
+- Measured numbers overwrite the profile's params/EQ/gate/space with the provenance kept per value,
+  and the response says plainly that it measured the **mix**, not an isolated guitar stem.
 
 **MIDI bridge**
 
@@ -429,7 +434,9 @@ More: [`docs/MIDI_SETUP_WINDOWS.md`](docs/MIDI_SETUP_WINDOWS.md) and [`docs/INST
   by `Presets.db`, not by the folder.
 - **The 7-band fader's unity point is undocumented**, so the export applies only the sign of each EQ
   move (boost/cut) when the template has a graphic EQ; the amp's tone stack carries the actual curve.
-- **No model insertion.** AmpliTube exposes no scripting/remote API for building a chain; the recipe is applied by hand.
+- **No live model insertion.** AmpliTube exposes no scripting or remote API, so a model cannot be added
+  to a running session; the chain is built by hand, or cloned by `scripts/at5p_export.py` for a
+  preset you then open.
 - **Mapping is user-owned.** ToneForge cannot discover which CC you assigned; you tell it. That is a deliberate design choice, not a missing feature.
 - **MIDI reception is unverifiable from inside a plugin.** `applied: "unverified"` is the accurate answer.
 - **Preset-scope assignments.** Amp-knob CCs in AmpliTube are per-preset; drive several presets only after assigning the CCs in each.
@@ -447,8 +454,8 @@ More: [`docs/MIDI_SETUP_WINDOWS.md`](docs/MIDI_SETUP_WINDOWS.md) and [`docs/INST
 - Per-preset mapping sets (`mapping profile` keyed by AmpliTube preset name) so one library can drive many presets.
 - A `toneforge_export` command that prints a human-readable setup sheet (Markdown) for the pedalboard.
 - Program Change support for preset switching (AmpliTube accepts PC, per the manual).
-- A `.at5p` writer: clone an existing preset, swap model GUIDs from `AmpliTube 5.pak`, and verify it
-  loads in AmpliTube before offering it as a feature.
+- A `.at5p` **round-trip check**: after `scripts/at5p_export.py` writes a file, reopen it in a headless
+  AmpliTube session and confirm the chain matches, instead of relying on the next manual start.
 - A `/tone` slash command that shows the current preset and MIDI readiness in one line.
 
 ---
