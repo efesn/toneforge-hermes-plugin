@@ -4,6 +4,17 @@ All notable changes to ToneForge are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-11-07
+
+### Added
+- `scripts/at5p_export.py`: export a ToneForge preset as a native AmpliTube 5 `.at5p` by cloning an
+  existing preset's chain and re-writing the numbers. Model GUIDs are resolved from the user's own
+  presets and an unknown GUID aborts the write.
+
+### Changed
+- README no longer claims `.at5p` files cannot be produced; it states what the exporter actually does
+  and where its limits are.
+
 ## [1.1.0] — 2026-11-07
 
 Reference-track analysis: build a tone from what a recording actually measures instead

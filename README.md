@@ -15,7 +15,8 @@ ToneForge is explicit about the boundary between **designing a tone** and **chan
 | ToneForge does | ToneForge does not |
 |---|---|
 | Generate a full tone recipe you can dial in by hand | Insert models, change amp sims, or click inside AmpliTube for you |
-| Store, list, version, adjust and delete its own JSON presets | Write native AmpliTube `.at5p` preset files |
+| Store, list, version, adjust and delete its own JSON presets | Invent a model your AmpliTube edition does not have |
+| Export a stored preset to a real `.at5p` via `scripts/at5p_export.py`, verifying every model GUID against your own presets | Claim the export is bit-identical to what AmpliTube itself would save |
 | Send MIDI CC messages to a loopback port you selected | Guess that CC 20 "is" amp gain — AmpliTube has no such default |
 | Report exactly which bytes went out and on which port | Claim a parameter changed (only AmpliTube can show that) |
 | Explain every parameter move, with before/after values | Promise an exact reproduction of a recorded guitar tone |
@@ -59,6 +60,9 @@ Not verified on this machine, and therefore not claimed anywhere in the plugin:
 - JSON presets with schema version, slug, version counter, timestamps and notes.
 - Overwrite protection (explicit `overwrite=true` required), confirmation-gated deletes, atomic writes, path-traversal-proof slugs.
 - Adjust a stored preset without touching it; save the result in place (version bump) or under a new name.
+- **Export to a native `.at5p`** with `scripts/at5p_export.py`: it clones the chain skeleton from a
+  preset already on your disk, resolves amp/cab/effect GUIDs from those same presets, writes the
+  recipe's numbers, and refuses to emit a model GUID your library does not already use.
 
 **MIDI bridge**
 
@@ -419,10 +423,12 @@ More: [`docs/MIDI_SETUP_WINDOWS.md`](docs/MIDI_SETUP_WINDOWS.md) and [`docs/INST
 
 ## Limitations
 
-- **No native `.at5p` presets.** ToneForge writes JSON recipes only. (For the record: `.at5p` is not an
-  opaque binary - it is XML with model GUIDs that can be resolved from `AmpliTube 5.pak`. Writing one
-  is a clone-and-rewrite job, deliberately left outside the plugin until it can be verified inside
-  AmpliTube rather than merely parsed.)
+- **`.at5p` export is clone-and-rewrite, not synthesis.** `scripts/at5p_export.py` needs an existing
+  `.at5p` as the chain skeleton and can only use models your own presets already reference; it cannot
+  build a chain from nothing. AmpliTube lists the file after its next start, because the browser is fed
+  by `Presets.db`, not by the folder.
+- **The 7-band fader's unity point is undocumented**, so the export applies only the sign of each EQ
+  move (boost/cut) when the template has a graphic EQ; the amp's tone stack carries the actual curve.
 - **No model insertion.** AmpliTube exposes no scripting/remote API for building a chain; the recipe is applied by hand.
 - **Mapping is user-owned.** ToneForge cannot discover which CC you assigned; you tell it. That is a deliberate design choice, not a missing feature.
 - **MIDI reception is unverifiable from inside a plugin.** `applied: "unverified"` is the accurate answer.
@@ -466,6 +472,7 @@ The recording plan, narration, shot list and failure-recovery notes are in [`doc
 
 ```bash
 python -m unittest discover -s tests -v          # unit suite (151 tests, no hardware)
+python scripts/at5p_export.py --preset <slug>    # JSON preset -> native .at5p
 python scripts/live_midi_check.py                # real winmm MIDI egress (Windows)
 python scripts/test_amplitube.py loopback        # proves the loopMIDI cable end to end
 python scripts/test_amplitube.py sweep           # moves a mapped knob so you can watch it
