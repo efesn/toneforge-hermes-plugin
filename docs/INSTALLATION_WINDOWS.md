@@ -110,7 +110,7 @@ Then run the unit suite (no hardware required):
 ```bash
 cd "$HERMES_HOME/plugins/tone-forge"
 python -m unittest discover -s tests
-# Ran 149 tests ... OK
+# Ran 151 tests ... OK
 ```
 
 ---

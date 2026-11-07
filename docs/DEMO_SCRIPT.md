@@ -97,7 +97,7 @@ go straight to the close.
 
 ## 1:22-1:30 - close
 
-**Say:** "Seventeen tools, 149 tests, no third-party dependencies. It designs the tone,
+**Say:** "Seventeen tools, 151 tests, no third-party dependencies. It designs the tone,
 explains it, stores it, measures a record when you have one - and it is explicit about what
 it cannot verify."
 

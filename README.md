@@ -27,7 +27,7 @@ ToneForge is explicit about the boundary between **designing a tone** and **chan
 
 Last verified locally on **Windows 11, Python 3.14.9, Hermes Agent v0.23.0+381.g6b21d05**:
 
-- `python -m unittest discover -s tests` → **149 tests, all passing** (no MIDI hardware, no AmpliTube, no network).
+- `python -m unittest discover -s tests` → **151 tests, all passing** (no MIDI hardware, no AmpliTube, no network).
 - `hermes plugins validate ./tone-forge` → **Validation passed** (all 15 checks).
 - `hermes plugins doctor ./tone-forge --ci` → **17 tools registered**, runtime discovery + import + `register(ctx)` OK.
 - `toneforge_analyze_reference` → measured real reference clips end to end (a DSBM album track, two
@@ -166,7 +166,7 @@ hermes plugins doctor  "$HERMES_HOME/plugins/tone-forge" --ci
 python -m unittest discover -s tests
 ```
 
-Expected: `Validation passed`, `17 tool(s)` registered, and `Ran 149 tests ... OK`.
+Expected: `Validation passed`, `17 tool(s)` registered, and `Ran 151 tests ... OK`.
 
 `$HERMES_HOME` is `C:\Users\<you>\AppData\Local\hermes` on a default Windows install, or `~/.hermes`. Hermes loads plugin tools on the next session — restart the desktop app (or start a new `hermes` session) and the 17 `toneforge_*` tools appear.
 
@@ -465,7 +465,7 @@ The recording plan, narration, shot list and failure-recovery notes are in [`doc
 ## Development
 
 ```bash
-python -m unittest discover -s tests -v          # unit suite (149 tests, no hardware)
+python -m unittest discover -s tests -v          # unit suite (151 tests, no hardware)
 python scripts/live_midi_check.py                # real winmm MIDI egress (Windows)
 python scripts/test_amplitube.py loopback        # proves the loopMIDI cable end to end
 python scripts/test_amplitube.py sweep           # moves a mapped knob so you can watch it

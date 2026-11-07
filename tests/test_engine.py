@@ -208,5 +208,24 @@ class AdjustTests(unittest.TestCase):
         self.assertLess(updated["params"]["bass"], self.original["params"]["bass"])
 
 
+class RelativeInstructionTests(unittest.TestCase):
+    """Explicit amounts must be relative, and must not stack on the matching adjective."""
+
+    def base(self):
+        return tone_engine.build_tone(genre="industrial metal", tuning="drop D")
+
+    def test_reduce_by_is_relative_not_absolute(self):
+        cfg = self.base()
+        before = cfg["params"]["gain"]
+        tone_engine.apply_instructions(cfg, "reduce the gain by 5")
+        self.assertEqual(cfg["params"]["gain"], before - 5)
+
+    def test_relative_does_not_stack_on_the_adjective(self):
+        cfg = self.base()
+        before = cfg["params"]["gain"]
+        tone_engine.apply_instructions(cfg, "less gain, reduce the gain by 5")
+        self.assertEqual(cfg["params"]["gain"], before - 5)
+
+
 if __name__ == "__main__":
     unittest.main()

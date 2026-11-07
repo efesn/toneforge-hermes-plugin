@@ -472,10 +472,21 @@ _NUMERIC_RE = re.compile(
     re.IGNORECASE,
 )
 _OFF_BY_RE = re.compile(
-    r"\b(gain|bass|mids?|treble|presence)\b[^.\n]{0,24}?\b(up|down|higher|lower|back)\b[^.\n]{0,12}?"
-    r"(\d{1,2})\b",
+    r"\b(gain|bass|mids?|midrange|treble|presence|master)\b[^.\n]{0,24}?"
+    r"\b(up|down|higher|lower|back|raise|reduce|increase|decrease|cut|boost|drop|trim)\b"
+    r"[^.\n]{0,12}?(?:by\s+)?(\d{1,2})\b",
     re.IGNORECASE,
 )
+# "reduce the gain by 5" puts the verb first. The absolute rule below would otherwise read
+# that as "gain = 5", which is a silent, destructive misread of a relative request.
+_BY_VERB_RE = re.compile(
+    r"\b(reduce|reduced|raise|raised|increase|increased|decrease|decreased|cut|drop|trim|"
+    r"lower|lowered|bump|boost|boosted)\b[^.\n]{0,20}?"
+    r"\b(gain|bass|mids?|midrange|treble|presence|master)\b[^.\n]{0,12}?(?:by\s+)?(\d{1,2})\b",
+    re.IGNORECASE,
+)
+_NEGATIVE_VERBS = {"down", "lower", "lowered", "reduce", "reduced", "decrease", "decreased",
+                   "cut", "drop", "trim"}
 _PARAM_CANON = {
     "gain": "gain", "bass": "bass", "mid": "mid", "mids": "mid", "midrange": "mid",
     "treble": "treble", "presence": "presence", "master": "master",
@@ -491,6 +502,9 @@ def apply_instructions(cfg: dict, instructions: Optional[str]) -> list[str]:
     if len(text) > 2000:
         raise ValidationError("instructions are too long (max 2000 characters)")
     folded = V_fold(text)
+    # Explicit numbers are applied against the PRE-instruction values: "reduce the gain by 5"
+    # must not stack on top of the "reduce" adjective (that silently gave -14 instead of -5).
+    explicit_base = dict(cfg["params"])
 
     for pattern in _PURPOSE_TRIGGERS:
         if re.search(pattern[0], folded):
@@ -510,7 +524,34 @@ def apply_instructions(cfg: dict, instructions: Optional[str]) -> list[str]:
             families.add(family)
 
     # Explicit numbers last: "set the amp gain to 75" beats any adjective.
+    # Relative requests first ("reduce the gain by 5", "gain up 3"), then absolute ones
+    # ("set gain to 80"). Anything a relative rule consumed is skipped by the absolute rule.
+    consumed: list[tuple[int, int]] = []
+    for match in _OFF_BY_RE.finditer(folded):
+        param = _PARAM_CANON[match.group(1).casefold()]
+        direction = -1 if match.group(2).casefold() in _NEGATIVE_VERBS else 1
+        base = explicit_base.get(param, cfg["params"][param])
+        cfg["params"][param] = clamp_int(base + direction * int(match.group(3)), 0, 100)
+        explanations.append(
+            f"{PARAM_LABELS[param]} {base} -> {cfg['params'][param]} (explicit {direction * int(match.group(3)):+d})."
+        )
+        consumed.append(match.span())
+
+    for match in _BY_VERB_RE.finditer(folded):
+        if any(s <= match.start() < e for s, e in consumed):
+            continue
+        direction = -1 if match.group(1).casefold() in _NEGATIVE_VERBS else 1
+        param = _PARAM_CANON[match.group(2).casefold()]
+        base = explicit_base.get(param, cfg["params"][param])
+        cfg["params"][param] = clamp_int(base + direction * int(match.group(3)), 0, 100)
+        explanations.append(
+            f"{PARAM_LABELS[param]} {base} -> {cfg['params'][param]} (explicit {direction * int(match.group(3)):+d})."
+        )
+        consumed.append(match.span())
+
     for match in _NUMERIC_RE.finditer(folded):
+        if any(s <= match.start() < e for s, e in consumed):
+            continue
         param = _PARAM_CANON[match.group(1).casefold()]
         value = int(match.group(2))
         if value > 100:
@@ -522,14 +563,6 @@ def apply_instructions(cfg: dict, instructions: Optional[str]) -> list[str]:
         previous = cfg["params"][param]
         cfg["params"][param] = clamp_int(value, 0, 100)
         explanations.append(f"Set {PARAM_LABELS[param].lower()} to {cfg['params'][param]} (was {previous}).")
-
-    for match in _OFF_BY_RE.finditer(folded):
-        param = _PARAM_CANON[match.group(1).casefold()]
-        direction = -1 if match.group(2).casefold() in {"down", "lower"} else 1
-        amount = int(match.group(3))
-        applied_delta = _bump(cfg, param, direction * amount)
-        if applied_delta:
-            explanations.append(f"Moved {PARAM_LABELS[param].lower()} {applied_delta:+d} as requested.")
 
     return explanations
 
