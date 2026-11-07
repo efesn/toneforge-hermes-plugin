@@ -864,11 +864,22 @@ def build_tone(
 
     instruction_notes = apply_instructions(cfg, instructions)
     _sync_gate_pedal(cfg)
+    # The profile's rationale quotes the profile's *own* numbers. Tuning compensation, a pickup
+    # choice, a purpose switch or an instruction all move those numbers, so label the sentences
+    # as the baseline instead of letting the response contradict its own parameter list.
+    adjusted = (
+        bool(instruction_notes)
+        or tuning_key != profile["default_tuning"]
+        or purpose_key != profile["default_purpose"]
+        or pickup is not None
+    )
+    if adjusted:
+        cfg["why"] = [f"(profile baseline, before the changes above) {line}" for line in cfg["why"]]
     if instruction_notes:
         cfg["why"].insert(
             0,
-            "Your extra instructions moved some starting values; the profile rationale below describes "
-            "the starting point, and toneforge_adjust_preset reports exact before/after changes.",
+            "Your extra instructions moved some starting values; the applied changes are listed in "
+            "instructions_applied, and each profile sentence below describes the baseline.",
         )
 
     cfg["signal_chain"] = render_signal_chain(cfg)
