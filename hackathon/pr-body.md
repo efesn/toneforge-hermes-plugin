@@ -38,7 +38,7 @@ No hooks, no middleware, no Desktop surface, no core imports or overrides.
 
 ## Verification on the pinned tree
 
-- `python -m unittest discover -s tests` → 151 tests, OK (1 skipped: rtmidi not installed)
+- `python -m unittest discover -s tests` → 162 tests, OK (1 skipped: rtmidi not installed)
 - `hermes plugins validate ./tone-forge` → Validation passed (15 checks)
 - `hermes plugins doctor ./tone-forge --ci` → 17 tool(s), 0 hook(s)
 - `scripts/live_midi_check.py` → a real CC (`B0 14 66`) left the machine through `winmm`

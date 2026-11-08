@@ -82,7 +82,7 @@ guessing a style from a genre name. No native AmpliTube file format claims.
 
 **Engineering**
 - 17 tools, strict schemas, JSON-string handlers that never raise
-- 151 tests incl. reference analysis on synthetic `ffmpeg` fixtures
+- 162 tests incl. reference analysis on synthetic `ffmpeg` fixtures and the URL guard
 - `hermes plugins validate` → 15/15 checks; `hermes plugins doctor --ci` → 17 tools registered
 - live MIDI egress verified on real Windows hardware
 
@@ -92,7 +92,7 @@ guessing a style from a genre name. No native AmpliTube file format claims.
 
 | Claim | Evidence |
 |---|---|
-| Tests pass | `python -m unittest discover -s tests` → `Ran 151 tests … OK` |
+| Tests pass | `python -m unittest discover -s tests` → `Ran 162 tests … OK` |
 | Plugin validates | `hermes plugins validate ./tone-forge` → `Validation passed` (15 checks incl. declared-tools and security scan) |
 | Plugin loads and registers | `hermes plugins doctor ./tone-forge --ci` → `17 tool(s), 0 hook(s)` |
 | Real MIDI leaves the machine | `scripts/live_midi_check.py` → `B0 14 66` on `winmm`, rc 0, `LIVE MIDI SEND: OK` |
@@ -117,7 +117,7 @@ guessing a style from a genre name. No native AmpliTube file format claims.
 |---|---|
 | Usefulness | the industrial-metal Drop D recipe is a genuinely good starting point, not filler |
 | Depth of integration | hooks into real AmpliTube MIDI control, with its real constraints respected |
-| Engineering quality | 151 tests, typed exceptions, atomic writes, no core imports, modular by concern |
+| Engineering quality | 162 tests, typed exceptions, atomic writes, no core imports, modular by concern |
 | Honesty | explicit `applied: "unverified"`, measured-vs-inferred stated in every analysis response,
 no invented model names, no `.at5p` fabrication |
 | Documentation | README + feasibility report + Windows install + MIDI setup + architecture + 20 example prompts |
@@ -128,7 +128,7 @@ no invented model names, no `.at5p` fabrication |
 
 - 🎸 **ToneForge** — describe a tone, get the whole recipe, explained.
 - 🎛 **Real MIDI bridge** — no `pip install`, talks to Windows' MIDI driver directly; moves only the CCs you assigned.
-- 🧪 **151 tests, 17 tools, no third-party dependencies** — and it tells you what it cannot verify.
+- 🧪 **162 tests, 17 tools, no third-party dependencies** — and it tells you what it cannot verify.
 - 🎧 **Reference-track analysis** — give it a song; it measures the mix (bands, slope, rolloff, tuning,
   decay) and sets the recipe from the evidence, caveats attached.
 
@@ -137,7 +137,7 @@ no invented model names, no `.at5p` fabrication |
 ## 9. Pre-submission checklist
 
 Done:
-- [x] Plugin built, validated, loaded by Hermes (17 tools, 151 tests)
+- [x] Plugin built, validated, loaded by Hermes (17 tools, 162 tests)
 - [x] `CHANGELOG.md` 1.1.0 matches `plugin.yaml` and `pyproject.toml`
 - [x] README rewritten for 1.1.0 (counts, reference analysis, corrected `.at5p` claim, ffmpeg/yt-dlp rows)
 - [x] `ARCHITECTURE.md`, `SECURITY.md`, `EXAMPLE_PROMPTS.md`, `INSTALLATION_WINDOWS.md`, `DEMO_SCRIPT.md` updated

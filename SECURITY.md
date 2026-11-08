@@ -27,6 +27,13 @@ ToneForge is a local Hermes Agent plugin. It is designed to run with the least c
 - **No arbitrary process execution.** `os.system`, `eval`, `exec` and dynamic imports of
   user-controlled strings are absent. Reference analysis is the single `subprocess` user: `ffmpeg`
   to decode audio, plus `yt-dlp` when a `url` is given - fixed argv, no shell, bounded timeout.
+- **The `url` argument is validated before any subprocess exists.** Only `http`/`https` is accepted,
+  a value starting with `-` is refused (yt-dlp would otherwise read it as an option, and
+  `--config-locations` can load further options from a file), embedded credentials are refused, and
+  the hostname is resolved: any answer that is loopback, RFC1918 private, link-local, CGNAT, unique
+  local or a cloud-metadata endpoint aborts the call. `--` is placed before the URL in argv so the
+  value cannot be reinterpreted as an option. Residual risk: DNS is resolved twice (here and inside
+  yt-dlp), so a hostile resolver can still rebind between the two - the `--` separator contains that.
 - **Audio stays local.** A reference file is decoded from disk; a URL download lands in a temporary
   directory that is deleted when the call returns. No audio is copied into the preset library.
 - **No credential handling.** The plugin does not read, store, log, or transmit tokens, passwords, or API keys.

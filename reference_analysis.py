@@ -22,12 +22,15 @@ from __future__ import annotations
 
 import array
 import cmath
+import ipaddress
 import math
 import os
 import shutil
+import socket
 import subprocess
 import tempfile
 from typing import Any, Optional
+from urllib.parse import urlsplit
 
 ANALYSIS_SR = 16000
 NFFT = 4096
@@ -48,6 +51,103 @@ _GUITAR_LOW_STRINGS = {
 
 class AnalysisError(RuntimeError):
     """Raised when the audio cannot be decoded or the input is unusable."""
+
+
+class UrlRejected(AnalysisError):
+    """A caller-supplied URL that is not a plain, public http(s) URL."""
+
+
+# --------------------------------------------------------------------------- #
+# URL guard
+# --------------------------------------------------------------------------- #
+
+MAX_URL_LEN = 2048
+_LOCAL_HOST_SUFFIXES = (".local", ".localhost", ".internal", ".home.arpa", ".lan",
+                        ".localdomain", ".intranet", ".corp")
+
+
+def _resolve_host(host: str, port: Optional[int]) -> set[str]:
+    try:
+        infos = socket.getaddrinfo(host, port or 443, type=socket.SOCK_STREAM)
+    except (socket.gaierror, UnicodeError) as exc:
+        raise UrlRejected(f"could not resolve {host!r}") from exc
+    return {str(info[4][0]).split("%", 1)[0] for info in infos if info[4]}
+
+
+def validate_url(url: str) -> str:
+    """Accept a plain public http(s) URL and return it normalised; refuse anything else.
+
+    Two distinct things are being blocked here. The value becomes an argv element for
+    ``yt-dlp``, so a leading ``-`` would be read as an option - and options like
+    ``--config-locations=<file>`` load further options from a file, ``--exec`` among them.
+    Separately, any http target would be fetched, so loopback, RFC1918, link-local and
+    cloud-metadata endpoints are refused after resolution, not just by name.
+
+    Resolution happens twice - here and inside ``yt-dlp`` - so a hostile resolver could
+    still rebind between the two. The ``--`` separator written by :func:`download_argv`
+    is what keeps the URL out of the option namespace in that window.
+    """
+    if not isinstance(url, str):
+        raise UrlRejected("url must be a string")
+    value = url.strip()
+    if not value:
+        raise UrlRejected("url is empty")
+    if len(value) > MAX_URL_LEN:
+        raise UrlRejected(f"url is longer than {MAX_URL_LEN} characters")
+    if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in value):
+        raise UrlRejected("url contains control characters")
+    if value.startswith("-"):
+        raise UrlRejected("url must not start with '-' - yt-dlp would read it as an option")
+    try:
+        parts = urlsplit(value)
+    except ValueError as exc:
+        raise UrlRejected("url is not parseable") from exc
+    scheme = (parts.scheme or "").lower()
+    if scheme not in ("http", "https"):
+        raise UrlRejected("only http and https URLs are fetched")
+    if not parts.netloc:
+        raise UrlRejected("url has no host")
+    if "@" in parts.netloc:
+        raise UrlRejected("url must not carry credentials")
+    try:
+        host = parts.hostname or ""
+        port = parts.port
+    except ValueError as exc:
+        raise UrlRejected("url has an invalid port") from exc
+    if not host:
+        raise UrlRejected("url has no host")
+    bare = host.rstrip(".").lower()
+    if bare == "localhost" or bare.endswith(_LOCAL_HOST_SUFFIXES):
+        raise UrlRejected("url points at a local host name")
+    addresses = _resolve_host(host, port)
+    if not addresses:
+        raise UrlRejected("url did not resolve to an address")
+    for addr in addresses:
+        try:
+            ip = ipaddress.ip_address(addr)
+        except ValueError as exc:
+            raise UrlRejected("url resolved to an unparseable address") from exc
+        if not ip.is_global:
+            raise UrlRejected(
+                f"url resolves to a non-public address ({ip}); loopback, private, "
+                "link-local and metadata endpoints are refused")
+    if ":" in host:
+        netloc = f"[{host}]" + ("" if port is None else f":{port}")
+    else:
+        netloc = host if port is None else f"{host}:{port}"
+    path = parts.path or "/"
+    return f"{scheme}://{netloc}{path}" + (f"?{parts.query}" if parts.query else "")
+
+
+def download_argv(exe: str, url: str, target: str) -> list[str]:
+    """yt-dlp argv for the download. ``--`` ends option parsing, so the URL is positional."""
+    return [exe, "--no-playlist", "-f", "bestaudio/best", "-x", "--audio-format", "wav",
+            "-o", target, "--", url]
+
+
+def metadata_argv(exe: str, url: str) -> list[str]:
+    """yt-dlp argv for the ``-J`` probe, with the same ``--`` guard."""
+    return [exe, "--no-playlist", "-J", "--", url]
 
 
 # --------------------------------------------------------------------------- #
@@ -83,6 +183,7 @@ def probe_duration(path: str) -> Optional[float]:
 
 def download(url: str, workdir: str) -> tuple[str, dict[str, Any]]:
     """Fetch the audio track for a URL with yt-dlp. Returns (path, metadata)."""
+    url = validate_url(url)
     exe = yt_dlp()
     if not exe:
         raise AnalysisError(
@@ -90,9 +191,8 @@ def download(url: str, workdir: str) -> tuple[str, dict[str, Any]]:
             "pass a local audio file path instead."
         )
     target = os.path.join(workdir, "reference.%(ext)s")
-    cmd = [exe, "--no-playlist", "-f", "bestaudio/best", "-x", "--audio-format", "wav",
-           "-o", target, url]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+    proc = subprocess.run(download_argv(exe, url, target),
+                          capture_output=True, text=True, timeout=900)
     produced = None
     for name in os.listdir(workdir):
         if name.startswith("reference.") and name.endswith(".wav"):
@@ -106,7 +206,7 @@ def download(url: str, workdir: str) -> tuple[str, dict[str, Any]]:
             continue
     try:
         meta = subprocess.run(
-            [exe, "--no-playlist", "-J", url], capture_output=True, text=True, timeout=180
+            metadata_argv(exe, url), capture_output=True, text=True, timeout=180
         )
         if meta.stdout:
             import json

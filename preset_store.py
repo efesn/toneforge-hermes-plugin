@@ -15,6 +15,7 @@ Storage rules
 from __future__ import annotations
 
 import json
+import pathlib
 import os
 import tempfile
 from datetime import datetime, timezone
@@ -30,7 +31,21 @@ except Exception:  # pragma: no cover - exercised only outside Hermes
 
 PLUGIN_NAME = "tone-forge"
 SCHEMA_VERSION = 1
-PLUGIN_VERSION = "1.0.0"
+def _plugin_version() -> str:
+    """Read the version from plugin.yaml so records cannot drift from the manifest."""
+    try:
+        manifest = pathlib.Path(__file__).with_name("plugin.yaml")
+        for line in manifest.read_text(encoding="utf-8").splitlines():
+            if line.startswith("version:"):
+                value = line.split(":", 1)[1].strip().strip('"').strip("'")
+                if value:
+                    return value
+    except OSError:
+        pass
+    return "1.1.2"
+
+
+PLUGIN_VERSION = _plugin_version()
 MAX_FILE_BYTES = 1_000_000
 
 

@@ -189,6 +189,10 @@ def analyze_reference(args: dict, **_: Any) -> dict:
         path = V.require_text(path, "path", max_len=4096)
     if url is not None:
         url = V.require_text(url, "url", max_len=2048)
+        try:
+            url = reference_analysis.validate_url(url)
+        except reference_analysis.AnalysisError as exc:
+            raise V.ValidationError(str(exc)) from exc
     if not path and not url:
         raise V.ValidationError("give either 'path' (a local audio file) or 'url'")
 

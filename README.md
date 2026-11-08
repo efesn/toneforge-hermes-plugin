@@ -25,7 +25,7 @@ note-for-note reproduction of a recorded guitar tone.
 
 Last verified locally on **Windows 11, Python 3.14.9, Hermes Agent v0.23.0+381.g6b21d05**:
 
-- `python -m unittest discover -s tests` → **151 tests, all passing** (no MIDI hardware, no AmpliTube, no network).
+- `python -m unittest discover -s tests` → **162 tests, all passing** (no MIDI hardware, no AmpliTube, no network).
 - `hermes plugins validate ./tone-forge` → **Validation passed** (all 15 checks).
 - `hermes plugins doctor ./tone-forge --ci` → **17 tools registered**, runtime discovery + import + `register(ctx)` OK.
 - `toneforge_analyze_reference` → measured real reference clips end to end (a DSBM album track, two
@@ -65,6 +65,9 @@ Not verified on this machine, and therefore not claimed anywhere in the plugin:
 
 - `toneforge_analyze_reference`: local file or URL → octave and third-octave balance, spectral
   slope, 95% rolloff, low-frequency tuning peaks, decay tail and stereo width.
+- **URLs are guarded before yt-dlp ever runs:** `http`/`https` only, no leading `-`, no embedded
+  credentials, and the hostname is resolved first and refused if any answer is loopback, private,
+  link-local, CGNAT or a cloud-metadata address. `--` precedes the URL in argv so it stays positional.
 - `ffmpeg` decode plus a pure-Python FFT, so the plugin still needs no third-party packages.
 - Measured numbers overwrite the profile's params/EQ/gate/space with the provenance kept per value,
   and the response says plainly that it measured the **mix**, not an isolated guitar stem.
@@ -175,7 +178,7 @@ hermes plugins doctor  "$HERMES_HOME/plugins/tone-forge" --ci
 python -m unittest discover -s tests
 ```
 
-Expected: `Validation passed`, `17 tool(s)` registered, and `Ran 151 tests ... OK`.
+Expected: `Validation passed`, `17 tool(s)` registered, and `Ran 162 tests ... OK`.
 
 `$HERMES_HOME` is `C:\Users\<you>\AppData\Local\hermes` on a default Windows install, or `~/.hermes`. Hermes loads plugin tools on the next session — restart the desktop app (or start a new `hermes` session) and the 17 `toneforge_*` tools appear.
 
@@ -478,7 +481,7 @@ The recording plan, narration, shot list and failure-recovery notes are in [`doc
 ## Development
 
 ```bash
-python -m unittest discover -s tests -v          # unit suite (151 tests, no hardware)
+python -m unittest discover -s tests -v          # unit suite (162 tests, no hardware)
 python scripts/at5p_export.py --preset <slug>    # JSON preset -> native .at5p
 python scripts/live_midi_check.py                # real winmm MIDI egress (Windows)
 python scripts/test_amplitube.py loopback        # proves the loopMIDI cable end to end

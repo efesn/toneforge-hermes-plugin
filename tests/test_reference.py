@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
+import re
 import shutil
 import subprocess
 import tempfile
@@ -114,3 +116,93 @@ class ToolContractTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class UrlGuardTests(unittest.TestCase):
+    """The `url` argument reaches yt-dlp as an argv element, so it is guarded twice."""
+
+    def setUp(self):
+        self._real_resolve = reference_analysis._resolve_host
+
+    def tearDown(self):
+        reference_analysis._resolve_host = self._real_resolve
+
+    def _resolve_to(self, *addresses):
+        reference_analysis._resolve_host = lambda host, port: set(addresses)
+
+    def test_option_like_values_are_refused(self):
+        for value in ("-o", "--config-locations=/tmp/x", " -f bestaudio", "--exec", "-"):
+            with self.assertRaises(reference_analysis.UrlRejected, msg=value):
+                reference_analysis.validate_url(value)
+
+    def test_only_http_and_https_are_fetched(self):
+        for value in ("file:///etc/passwd", "ftp://example.com/a.mp3",
+                      "javascript:alert(1)", "//example.com/a", "example.com/a.mp3"):
+            with self.assertRaises(reference_analysis.UrlRejected, msg=value):
+                reference_analysis.validate_url(value)
+
+    def test_credentials_are_refused(self):
+        with self.assertRaises(reference_analysis.UrlRejected):
+            reference_analysis.validate_url("https://user:pass@example.com/a.mp3")
+
+    def test_local_names_are_refused_without_dns(self):
+        for value in ("http://localhost/", "http://printer.local/a.mp3",
+                      "http://metadata.google.internal/x", "http://db.internal/"):
+            with self.assertRaises(reference_analysis.UrlRejected, msg=value):
+                reference_analysis.validate_url(value)
+
+    def test_non_public_addresses_are_refused_after_resolution(self):
+        blocked = {
+            "loopback-v4": "127.0.0.1",
+            "loopback-v6": "::1",
+            "private-10": "10.1.2.3",
+            "private-192": "192.168.1.10",
+            "link-local": "169.254.1.1",
+            "metadata": "169.254.169.254",
+            "cgnat": "100.64.0.1",
+            "unique-local-v6": "fd00::1",
+            "unspecified": "0.0.0.0",
+        }
+        for label, addr in blocked.items():
+            self._resolve_to(addr)
+            with self.assertRaises(reference_analysis.UrlRejected, msg=label):
+                reference_analysis.validate_url("https://example.com/a.mp3")
+
+    def test_one_bad_address_in_a_mixed_answer_is_enough_to_refuse(self):
+        self._resolve_to("93.184.216.34", "10.0.0.5")
+        with self.assertRaises(reference_analysis.UrlRejected):
+            reference_analysis.validate_url("https://example.com/a.mp3")
+
+    def test_public_url_is_accepted_and_normalised(self):
+        self._resolve_to("93.184.216.34")
+        out = reference_analysis.validate_url("HTTPS://Example.COM/a/b.mp3?x=1#frag")
+        self.assertEqual(out, "https://example.com/a/b.mp3?x=1")
+
+    def test_double_dash_precedes_the_url_in_both_argvs(self):
+        self._resolve_to("93.184.216.34")
+        url = reference_analysis.validate_url("https://example.com/a.mp3")
+        download = reference_analysis.download_argv("yt-dlp", url, "out.%(ext)s")
+        meta = reference_analysis.metadata_argv("yt-dlp", url)
+        self.assertEqual(download[-2:], ["--", url])
+        self.assertEqual(meta[-2:], ["--", url])
+        self.assertNotIn("--", download[:-2])
+        self.assertEqual(download[-4:-2], ["-o", "out.%(ext)s"])
+
+    def test_download_refuses_before_looking_for_yt_dlp(self):
+        with self.assertRaises(reference_analysis.UrlRejected):
+            reference_analysis.download("-o", tempfile.mkdtemp(prefix="tf-ref-"))
+
+    def test_tool_reports_the_refusal_as_a_clean_error(self):
+        self._resolve_to("169.254.169.254")
+        payload = json.loads(tools.analyze_reference(
+            {"url": "http://169.254.169.254/latest/meta-data/"}))
+        self.assertFalse(payload["ok"])
+        self.assertIn("non-public address", payload["error"])
+
+
+class VersionTests(unittest.TestCase):
+    def test_preset_records_carry_the_manifest_version(self):
+        from _pkg import preset_store
+        manifest = (pathlib.Path(preset_store.__file__).with_name("plugin.yaml")
+                    .read_text(encoding="utf-8"))
+        declared = re.search(r"^version:\s*(\S+)", manifest, re.M).group(1).strip('"')
+        self.assertEqual(preset_store.PLUGIN_VERSION, declared)

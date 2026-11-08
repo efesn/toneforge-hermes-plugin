@@ -4,6 +4,28 @@ All notable changes to ToneForge are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] — 2026-11-08
+
+Security fix from catalog review (teknium1, PR #150810).
+
+### Fixed
+- `toneforge_analyze_reference` no longer passes a caller-supplied `url` to `yt-dlp` as an
+  unvalidated argv element. `reference_analysis.validate_url()` now accepts only `http`/`https`,
+  refuses values starting with `-` (which yt-dlp reads as options, `--config-locations` included),
+  refuses embedded credentials and local host names, and resolves the hostname before the call -
+  any loopback, RFC1918, link-local, CGNAT, unique-local or cloud-metadata answer aborts it.
+- `--` now precedes the URL in both the download and the `-J` metadata argv, so the value stays
+  positional even if resolution changes between check and use.
+
+### Fixed (non-blocking review note)
+- `preset_store.PLUGIN_VERSION` reads the version from `plugin.yaml` instead of a hardcoded
+  `"1.0.0"`, and a test fails if the two ever drift.
+
+### Tests
+- 11 new tests (162 total): option-like values, non-http schemes, credentials, local names,
+  nine non-public address classes, mixed DNS answers, argv `--` placement, refusal before the
+  yt-dlp lookup, the tool's JSON error envelope, and manifest/record version parity.
+
 ## [1.1.1] — 2026-11-07
 
 ### Added
